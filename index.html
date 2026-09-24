@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="sr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Kviz evropskih zastava — Prototip 2</title>
+<style>
+:root{--bg:#080d1a;--panel:#111a2d;--panel2:#18243d;--line:#2a3a5e;--text:#f5f7ff;--muted:#9daac6;--accent:#6ea8ff}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(circle at top,#162443,#080d1a 58%);color:var(--text);font-family:Inter,Arial,sans-serif;display:flex;align-items:center;justify-content:center;padding:24px}
+.app{width:min(980px,96vw);background:#0e1628ee;border:1px solid var(--line);border-radius:24px;padding:30px;box-shadow:0 24px 80px #0009}
+.screen{display:none}.screen.active{display:block}h1{font-size:38px;margin:0 0 8px}.sub{color:var(--muted);margin:0 0 28px;line-height:1.5}
+.diffs{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}.diff{padding:20px 12px;border:1px solid var(--line);background:var(--panel2);color:var(--text);border-radius:16px;cursor:pointer;font-weight:800;font-size:17px}.diff:hover{border-color:var(--accent);transform:translateY(-2px)}.diff span{display:block;color:var(--muted);font-size:13px;font-weight:500;margin-top:8px}
+.hud{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;margin-bottom:18px;color:var(--muted);font-weight:700}.hud .score{text-align:center}.timer{text-align:right;font-size:22px;color:#fff}.timer.warn{color:#ffd166}.timer.danger{color:#ff6b6b}
+.progressbar{height:7px;background:#202d49;border-radius:99px;overflow:hidden;margin-bottom:22px}.progressbar div{height:100%;background:var(--accent);width:0%;transition:.25s}
+.flagbox{height:330px;background:#070b14;border:1px solid var(--line);border-radius:18px;display:flex;align-items:center;justify-content:center;overflow:hidden;margin-bottom:20px}.flagbox canvas{width:min(720px,92%);height:auto;image-rendering:auto;border-radius:5px;box-shadow:0 12px 40px #000b}
+.answers{display:grid;grid-template-columns:1fr 1fr;gap:12px}.answers button,.mainbtn{border:1px solid var(--line);border-radius:13px;background:var(--panel2);color:var(--text);padding:15px;font-size:16px;font-weight:700;cursor:pointer}.answers button:hover,.mainbtn:hover{border-color:var(--accent);background:#213354}.answers button.correct{background:#155c40;border-color:#2ac98b}.answers button.wrong{background:#642f3b;border-color:#f06b7b}
+.feedback{text-align:center;min-height:27px;margin:14px 0;font-weight:800}.center{text-align:center}.finalscore{font-size:64px;font-weight:900;margin:20px}.muted{color:var(--muted)}
+.note{font-size:13px;color:#8290ad;margin-top:20px}
+@media(max-width:720px){.diffs{grid-template-columns:1fr 1fr}.answers{grid-template-columns:1fr}.flagbox{height:260px}.hud{grid-template-columns:1fr 1fr;gap:8px}.hud .score{text-align:left}.timer{text-align:right}}
+</style>
+</head>
+<body>
+<div class="app">
+<section id="menu" class="screen active">
+<h1>🇪🇺 Kviz evropskih zastava</h1>
+<p class="sub">Prototip 2 — manje zastave je vidljivo, otkrivanje je nepravilno, a ponuđeni odgovori su namerno sličniji.</p>
+<div class="diffs">
+<button class="diff" onclick="start('easy')">Lako<span>5 pitanja · ~55% vidljivo</span></button>
+<button class="diff" onclick="start('normal')">Normalno<span>7 pitanja · ~35% vidljivo</span></button>
+<button class="diff" onclick="start('hard')">Teško<span>10 pitanja · ~20% vidljivo</span></button>
+<button class="diff" onclick="start('impossible')">Nemoguće<span>12 pitanja · ~9% vidljivo</span></button>
+</div>
+<p class="note">6 minuta za celu igru. Svaka partija je nasumična.</p>
+</section>
+
+<section id="game" class="screen">
+<div class="hud">
+<div id="qnum">Pitanje 1 / 5</div>
+<div class="score" id="score">Poeni: 0</div>
+<div class="timer" id="timer">6:00</div>
+</div>
+<div class="progressbar"><div id="progress"></div></div>
+<div class="flagbox"><canvas id="flag" width="720" height="480"></canvas></div>
+<div class="answers" id="answers"></div>
+<div class="feedback" id="feedback"></div>
+</section>
+
+<section id="result" class="screen center">
+<h1>Kviz završen</h1>
+<div class="finalscore" id="final">0 / 5</div>
+<p class="muted" id="message"></p>
+<button class="mainbtn" onclick="show('menu')">Nazad na meni</button>
+</section>
+</div>
+
+<script>
+const F={
+France:{type:'v',c:['#0055a4','#fff','#ef4135']},
+Netherlands:{type:'h',c:['#ae1c28','#fff','#21468b']},
+Luxembourg:{type:'h',c:['#ef3340','#fff','#00a3e0']},
+Russia:{type:'h',c:['#fff','#0039a6','#d52b1e']},
+Germany:{type:'h',c:['#111','#d00','#ffce00']},
+Belgium:{type:'v',c:['#111','#f9d616','#ed2939']},
+Romania:{type:'v',c:['#002b7f','#fcd116','#ce1126']},
+Chad:{type:'v',c:['#002664','#fecb00','#c60c30']},
+Italy:{type:'v',c:['#009246','#fff','#ce2b37']},
+Ireland:{type:'v',c:['#169b62','#fff','#ff883e']},
+IvoryCoast:{type:'v',c:['#ff883e','#fff','#169b62']},
+Hungary:{type:'h',c:['#ce2939','#fff','#477050']},
+Bulgaria:{type:'h',c:['#fff','#00966e','#d62612']},
+SierraLeone:{type:'h',c:['#1eb53a','#fff','#0072c6']},
+Austria:{type:'h',c:['#ed2939','#fff','#ed2939']},
+Poland:{type:'h',c:['#fff','#dc143c']},
+Ukraine:{type:'h',c:['#0057b7','#ffd700']},
+Greece:{type:'greece',c:['#0d5eaf','#fff']},
+Croatia:{type:'checker',c:['#ff0000','#fff']},
+Slovenia:{type:'slovenia',c:['#fff','#0b4ea2','#ed1c24']},
+Slovakia:{type:'slovakia',c:['#fff','#0b4ea2','#ee1c25']},
+Serbia:{type:'serbia',c:['#c6363c','#0c4076','#fff']},
+Czechia:{type:'czech',c:['#fff','#d7141a','#11457e']},
+Denmark:{type:'cross',c:['#c8102e','#fff']},
+Switzerland:{type:'cross2',c:['#d52b1e','#fff']},
+Georgia:{type:'georgia',c:['#fff','#ff0000']},
+Portugal:{type:'portugal',c:['#046a38','#da291c']},
+Spain:{type:'spain',c:['#aa151b','#f1bf00']},
+Iceland:{type:'cross',c:['#02529c','#fff']},
+Finland:{type:'cross',c:['#fff','#003580']},
+Sweden:{type:'cross',c:['#006aa7','#fecc00']}
+};
+
+const sets={
+easy:{n:5,r:.55},
+normal:{n:7,r:.35},
+hard:{n:10,r:.20},
+impossible:{n:12,r:.09}
+};
+let diff,qs=[],i=0,score=0,left=360,timer,locked=false;
+
+function show(id){document.querySelectorAll('.screen').forEach(x=>x.classList.remove('active'));document.getElementById(id).classList.add('active')}
+function shuffle(a){return [...a].sort(()=>Math.random()-.5)}
+function start(d){diff=d;i=0;score=0;left=360;locked=false;qs=shuffle(Object.keys(F)).slice(0,sets[d].n);show('game');draw();update();clearInterval(timer);timer=setInterval(()=>{left--;updateTimer();if(left<=0){clearInterval(timer);finish(true)}},1000)}
+function update(){document.getElementById('qnum').textContent=`Pitanje ${i+1} / ${sets[diff].n}`;document.getElementById('score').textContent=`Poeni: ${score}`;document.getElementById('progress').style.width=`${i/sets[diff].n*100}%`;updateTimer()}
+function updateTimer(){let m=Math.floor(left/60),s=String(left%60).padStart(2,'0'),e=document.getElementById('timer');e.textContent=`${m}:${s}`;e.className='timer'+(left<=30?' danger':left<=60?' warn':'')}
+function draw(){
+locked=false;document.getElementById('feedback').textContent='';
+let answer=qs[i];drawFlag(answer,sets[diff].r);
+let group=chooseDistractors(answer);
+let choices=shuffle([answer,...group]);
+let box=document.getElementById('answers');box.innerHTML='';
+choices.forEach(x=>{let b=document.createElement('button');b.textContent=pretty(x);b.onclick=()=>pick(x,b,answer);box.appendChild(b)})
+}
+function pretty(x){const s={France:'Francuska',Netherlands:'Holandija',Luxembourg:'Luksemburg',Russia:'Rusija',Germany:'Nemačka',Belgium:'Belgija',Romania:'Rumunija',Chad:'Čad',Italy:'Italija',Ireland:'Irska',IvoryCoast:'Obala Slonovače',Hungary:'Mađarska',Bulgaria:'Bugarska',SierraLeone:'Sijera Leone',Austria:'Austrija',Poland:'Poljska',Ukraine:'Ukrajina',Greece:'Grčka',Croatia:'Hrvatska',Slovenia:'Slovenija',Slovakia:'Slovačka',Serbia:'Srbija',Czechia:'Češka',Denmark:'Danska',Switzerland:'Švajcarska',Georgia:'Gruzija',Portugal:'Portugal',Spain:'Španija',Iceland:'Island',Finland:'Finska',Sweden:'Švedska'};return s[x]||x}
+function chooseDistractors(a){
+const similar={
+France:['Netherlands','Russia','Luxembourg'],Netherlands:['Luxembourg','Russia','France'],Luxembourg:['Netherlands','France','Russia'],
+Russia:['Slovakia','Slovenia','Serbia'],Germany:['Belgium','Austria','Hungary'],Belgium:['Germany','Romania','Chad'],
+Romania:['Chad','Belgium','France'],Chad:['Romania','Belgium','Italy'],Italy:['Ireland','Hungary','Belgium'],
+Ireland:['Italy','IvoryCoast','France'],IvoryCoast:['Ireland','Italy','France'],Hungary:['Bulgaria','Germany','Austria'],
+Bulgaria:['Hungary','SierraLeone','Russia'],SierraLeone:['Bulgaria','Ukraine','Finland'],Austria:['Germany','Poland','Hungary'],
+Poland:['Austria','Indonesia','Ukraine'],Ukraine:['Poland','Sweden','Finland'],Greece:['Finland','Iceland','Sweden'],
+Croatia:['Slovenia','Serbia','Slovakia'],Slovenia:['Slovakia','Serbia','Croatia'],Slovakia:['Slovenia','Serbia','Croatia'],
+Serbia:['Slovakia','Slovenia','Croatia'],Czechia:['Slovakia','Slovenia','Croatia'],Denmark:['Switzerland','Iceland','Norway'],
+Switzerland:['Denmark','Georgia','Turkey'],Georgia:['Switzerland','Denmark','England'],Portugal:['Spain','Romania','Italy'],
+Spain:['Portugal','Romania','Italy'],Iceland:['Finland','Sweden','Denmark'],Finland:['Sweden','Iceland','Greece'],Sweden:['Finland','Iceland','Ukraine']
+};
+return similar[a]||shuffle(Object.keys(F).filter(x=>x!==a)).slice(0,3);
+}
+function pick(x,b,a){
+if(locked)return;locked=true;
+let bs=[...document.querySelectorAll('#answers button')];bs.forEach(z=>z.disabled=true);
+if(x===a){score++;b.classList.add('correct');document.getElementById('feedback').textContent='✓ Tačno!'}
+else{b.classList.add('wrong');let good=bs.find(z=>z.textContent===pretty(a));if(good)good.classList.add('correct');document.getElementById('feedback').textContent=`✗ Bila je to zastava: ${pretty(a)}.`}
+update();
+setTimeout(()=>{i++;if(i>=qs.length)finish(false);else{update();draw()}},600);
+}
+function finish(timeout){
+clearInterval(timer);show('result');document.getElementById('final').textContent=`${score} / ${sets[diff].n}`;
+document.getElementById('message').textContent=timeout?'Vreme je isteklo. Zastave su pobedile ovu rundu.':'Igra je završena. Probaj veću težinu!';
+}
+function drawFlag(name,reveal){
+const c=document.getElementById('flag'),x=c.getContext('2d'),w=c.width,h=c.height;x.clearRect(0,0,w,h);
+let f=F[name];x.fillStyle='#ddd';x.fillRect(0,0,w,h);
+if(f.type==='v'){f.c.forEach((z,k)=>{x.fillStyle=z;x.fillRect(k*w/f.c.length,0,w/f.c.length+1,h)})}
+if(f.type==='h'){f.c.forEach((z,k)=>{x.fillStyle=z;x.fillRect(0,k*h/f.c.length,w,h/f.c.length+1)})}
+if(f.type==='serbia'){x.fillStyle='#c6363c';x.fillRect(0,0,w,h/3);x.fillStyle='#0c4076';x.fillRect(0,h/3,w,h/3);x.fillStyle='#fff';x.fillRect(0,2*h/3,w,h/3);x.fillStyle='#c6363c';x.fillRect(0,0,w*.4,h*.62)}
+if(f.type==='greece'){x.fillStyle='#0d5eaf';x.fillRect(0,0,w,h);x.strokeStyle='#fff';x.lineWidth=18;for(let y=35;y<h;y+=48){x.beginPath();x.moveTo(0,y);x.lineTo(w,y);x.stroke()}x.fillStyle='#0d5eaf';x.fillRect(0,0,190,190);x.strokeStyle='#fff';x.lineWidth=18;x.beginPath();x.moveTo(95,0);x.lineTo(95,190);x.moveTo(0,95);x.lineTo(190,95);x.stroke()}
+if(f.type==='checker'){for(let y=0;y<8;y++)for(let z=0;z<12;z++){x.fillStyle=(y+z)%2?'#fff':'#ff0000';x.fillRect(z*w/12,y*h/8,w/12+1,h/8+1)}}
+if(f.type==='slovenia'||f.type==='slovakia'){f.c.forEach((z,k)=>{x.fillStyle=z;x.fillRect(0,k*h/3,w,h/3)});x.fillStyle='#fff';x.beginPath();x.arc(110,120,45,0,7);x.fill()}
+if(f.type==='czech'){x.fillStyle='#fff';x.fillRect(0,0,w,h/2);x.fillStyle='#d7141a';x.fillRect(0,h/2,w,h/2);x.fillStyle='#11457e';x.beginPath();x.moveTo(0,0);x.lineTo(w*.45,h/2);x.lineTo(0,h);x.fill()}
+if(f.type==='cross'){x.fillStyle=f.c[0];x.fillRect(0,0,w,h);x.fillStyle=f.c[1];x.fillRect(w*.32,0,w*.16,h);x.fillRect(0,h*.4,w,h*.2)}
+if(f.type==='cross2'){x.fillStyle=f.c[0];x.fillRect(0,0,w,h);x.fillStyle=f.c[1];x.fillRect(w*.36,0,w*.28,h);x.fillRect(0,h*.35,w,h*.3)}
+if(f.type==='georgia'){x.fillStyle='#fff';x.fillRect(0,0,w,h);x.fillStyle='#ff0000';x.fillRect(w*.45,0,w*.1,h);x.fillRect(0,h*.4,w,h*.2);[[.22,.22],[.78,.22],[.22,.78],[.78,.78]].forEach(p=>{x.fillRect(w*p[0]-.025*w,h*p[1]-.025*h,.05*w,.05*h)})}
+if(f.type==='portugal'){x.fillStyle='#046a38';x.fillRect(0,0,w*.42,h);x.fillStyle='#da291c';x.fillRect(w*.42,0,w*.58,h);x.fillStyle='#f1bf00';x.beginPath();x.arc(w*.42,h*.5,55,0,7);x.fill()}
+if(f.type==='spain'){x.fillStyle='#aa151b';x.fillRect(0,0,w,h*.25);x.fillStyle='#f1bf00';x.fillRect(0,h*.25,w,h*.5);x.fillStyle='#aa151b';x.fillRect(0,h*.75,w,h*.25)}
+// Irregular polygon "window" mask: most of the flag is hidden, not clean grid squares.
+let area=reveal, target=Math.max(1,Math.round(42*area));
+let cells=[];for(let yy=0;yy<6;yy++)for(let xx=0;xx<7;xx++)cells.push([xx,yy]);
+cells=shuffle(cells).slice(0,target);
+x.save();x.fillStyle='#070b14';x.beginPath();x.rect(0,0,w,h);x.fill();
+for(const [cx,cy] of cells){
+ let px=cx*w/7,py=cy*h/6;
+ let pts=[[px+Math.random()*25,py+Math.random()*20],[px+w/7-Math.random()*18,py+Math.random()*18],[px+w/7-Math.random()*25,py+h/6-Math.random()*18],[px+Math.random()*18,py+h/6-Math.random()*20]];
+ x.save();x.beginPath();x.moveTo(...pts[0]);pts.slice(1).forEach(p=>x.lineTo(...p));x.closePath();x.clip();
+ // redraw flag into the clipped area
+ if(f.type==='v'){f.c.forEach((z,k)=>{x.fillStyle=z;x.fillRect(k*w/f.c.length,0,w/f.c.length+1,h)})}
+ if(f.type==='h'){f.c.forEach((z,k)=>{x.fillStyle=z;x.fillRect(0,k*h/f.c.length,w,h/f.c.length+1)})}
+ if(f.type==='serbia'){x.fillStyle='#c6363c';x.fillRect(0,0,w,h/3);x.fillStyle='#0c4076';x.fillRect(0,h/3,w,h/3);x.fillStyle='#fff';x.fillRect(0,2*h/3,w,h/3)}
+ if(f.type==='greece'){x.fillStyle='#0d5eaf';x.fillRect(0,0,w,h);x.strokeStyle='#fff';x.lineWidth=18;for(let y=35;y<h;y+=48){x.beginPath();x.moveTo(0,y);x.lineTo(w,y);x.stroke()}}
+ if(f.type==='checker'){for(let y=0;y<8;y++)for(let z=0;z<12;z++){x.fillStyle=(y+z)%2?'#fff':'#ff0000';x.fillRect(z*w/12,y*h/8,w/12+1,h/8+1)}}
+ if(f.type==='slovenia'||f.type==='slovakia'){f.c.forEach((z,k)=>{x.fillStyle=z;x.fillRect(0,k*h/3,w,h/3)})}
+ if(f.type==='czech'){x.fillStyle='#fff';x.fillRect(0,0,w,h/2);x.fillStyle='#d7141a';x.fillRect(0,h/2,w,h/2);x.fillStyle='#11457e';x.beginPath();x.moveTo(0,0);x.lineTo(w*.45,h/2);x.lineTo(0,h);x.fill()}
+ if(f.type==='cross'){x.fillStyle=f.c[0];x.fillRect(0,0,w,h);x.fillStyle=f.c[1];x.fillRect(w*.32,0,w*.16,h);x.fillRect(0,h*.4,w,h*.2)}
+ if(f.type==='cross2'){x.fillStyle=f.c[0];x.fillRect(0,0,w,h);x.fillStyle=f.c[1];x.fillRect(w*.36,0,w*.28,h);x.fillRect(0,h*.35,w,h*.3)}
+ if(f.type==='georgia'){x.fillStyle='#fff';x.fillRect(0,0,w,h);x.fillStyle='#f00';x.fillRect(w*.45,0,w*.1,h);x.fillRect(0,h*.4,w,h*.2)}
+ if(f.type==='portugal'){x.fillStyle='#046a38';x.fillRect(0,0,w*.42,h);x.fillStyle='#da291c';x.fillRect(w*.42,0,w*.58,h)}
+ if(f.type==='spain'){x.fillStyle='#aa151b';x.fillRect(0,0,w,h*.25);x.fillStyle='#f1bf00';x.fillRect(0,h*.25,w,h*.5);x.fillStyle='#aa151b';x.fillRect(0,h*.75,w,h*.25)}
+ x.restore();
+}
+x.restore();
+if(diff==='impossible'){x.globalAlpha=.35;x.strokeStyle='#fff';x.lineWidth=1;for(let k=0;k<35;k++){x.beginPath();x.moveTo(Math.random()*w,Math.random()*h);x.lineTo(Math.random()*w,Math.random()*h);x.stroke()}x.globalAlpha=1}
+}
+</script>
+</body>
+</html>
